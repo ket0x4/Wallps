@@ -10,6 +10,7 @@ force_update_model = 0 # 0 = no, 1 = yes
 force_re_upscale = 0 # 0 = no, 1 = yes
 upscale_level = 4 # 2, 4, 8
 send_to_channel = 1 # 0 = no, 1 = yes
+model_name = "realesrgan-x4plus" # realesrgan-x2plus, realesrgan-x4plus, realesrgan-x8plus
 
 # telegram bot info
 api_id = 0
@@ -22,14 +23,10 @@ bot = pyrogram.Client("my_account", api_id, api_hash, bot_token=bot_token)
 script_path = os.path.dirname(os.path.abspath(__file__))
 workdir = os.path.join(script_path, 'workdir')
 temp = ".temp" # todo: make this a variable
-#upscaledir = os.path.join(script_path, 'upscale')
-#renamedir = os.path.join(script_path, 'rename')
-#posteddir = os.path.join(script_path, 'posted')
 readydir = os.path.join(script_path, 'ready')
 bin_path = os.path.join(script_path, 'bin')
 bin_name = "realesrgan-ncnn-vulkan"
 model_path = os.path.join(bin_path, 'models')
-model_name = "realesrgan-x4plus"
 realesrgan_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
 models_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
 realesrgan_zip_name = "realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
@@ -39,47 +36,15 @@ if os.name == 'nt':
     print("Windows is not supported")
     sys.exit()
 
-# create directories if they don't exist
-#if not os.path.exists(upscaledir):
-#    os.makedirs(upscaledir)
-#    print("Created Upscale directory")
 if not os.path.exists(workdir):
     os.makedirs(workdir)
     print("Created workdir directory")
-#if not os.path.exists(renamedir):
-#    os.makedirs(renamedir)
-#    print("Created Rename directory")
-#if not os.path.exists(posteddir):
-#    os.makedirs(posteddir)
-#    print("Created Posted directory")
 if not os.path.exists(readydir):
     os.makedirs(readydir)
     print("Created ready directory")
 if not os.path.exists(bin_path):
     os.makedirs(bin_path)
     print("Created bin directory")
-#if not os.path.exists(model_path):
-#    os.makedirs(model_path)
-#    print("Created models directory")
-
-#if force_update_resrgan == 0:
-#    print("Skipping RealESRGan download")
-#else:
-#    print("Removing old RealESRGan")
-#    os.system(f"rm -rf {bin_path}/*")
-
-#if force_update_model == 0:
-#    print("Skipping model download")
-#else:
-#    print("Removing old models")
-#    os.system(f"rm -rf {model_path}/*")
-
-#if "force_re_upscale" == 0:
-#    print("Skipping re-upscaling")
-#else:
-#    print("Removing old upscaled images")
-#    os.system(f"rm -rf {upscaledir}/*")
-
 
 # download RealESRGan with wget
 def download_realesrgan():
@@ -132,16 +97,16 @@ def upscale():
             width, height = image.size
             if width < 920 or height < 480:
                 print(f"{filename} is {width}x{height}. Upscaling...")
-                os.system(f"{os.path.join(bin_path, 'realesrgan-ncnn-vulkan')} -i {image_path} -o {os.path.join(readydir, filename)} -n {os.path.join(model_name)} -s {upscale_level} >> /dev/null 2>&1")
+                os.system(f"{os.path.join(bin_path, 'realesrgan-ncnn-vulkan')} -i {image_path} -o {os.path.join(workdir, filename)} -n {os.path.join(model_name)} -s {upscale_level} >> /dev/null 2>&1")
                 os.remove(image_path)
-                print(f"{filename} Upscaled {upscale_level}x: New size is {os.path.getsize(os.path.join(readydir, filename))}")
+#                print(f"{filename} Upscaled {upscale_level}x: New size is {os.path.getsize(os.path.join(workdir, filename))}")
             else:
                 print(f"{filename} is {width}x{height}. Skipping...")
                 os.system(f"mv {image_path} {os.path.join(readydir, filename)}")
                 print(f"{filename} Moved")
 
-# optimize png files
-def optimize_files():
+# optimize png files with pngquant
+def optimize_pngquant():
     print('Optimizing big files...')
     for filename in os.listdir(readydir):
         if filename.endswith(".png"):
@@ -149,6 +114,36 @@ def optimize_files():
             old_size = os.path.getsize(image_path)
             os.system(f"pngquant --skip-if-larger --strip --force --output {image_path} {image_path}")
             print(f"{filename} Optimized: from {old_size} to {os.path.getsize(image_path)}")
+
+# optimize png files with optipng
+def optimize_optipng():
+    print('Optimizing big files using Optifine Level 7...')
+    for filename in os.listdir(readydir):
+        if filename.endswith(".png"):
+            if os.path.getsize(os.path.join(readydir, filename)) < 1000000:
+                continue
+            else:
+                image_path = os.path.join(readydir, filename)
+                old_size = os.path.getsize(image_path)
+                os.system(f"optipng -o7 {image_path}")
+                print(f"{filename} Optimized: from {old_size} to {os.path.getsize(image_path)}")
+
+# downsacle big images by 25%
+def downscale():
+    for filename in os.listdir(readydir):
+        if filename.endswith(".png"):
+            if os.path.getsize(os.path.join(workdir, filename)) < 1000000:
+                continue
+            else:
+                print(f"{filename} is too big. Downscaling...")
+                image_path = os.path.join(workdir, filename)
+                image = Image.open(image_path)
+                width, height = image.size
+                new_width = int(width * 0.75)
+                new_height = int(height * 0.75)
+                image = image.resize((new_width, new_height), Image.ANTIALIAS)
+                image.save(image_path, "PNG")
+                print(f"{filename} Downscaled: New size is {os.path.getsize(image_path)}")
 
 # check telegram channel for last posted image name
 def check_latest():
@@ -168,6 +163,8 @@ download_realesrgan()
 download_models()
 convert2png()
 upscale()
-optimize_files()
-check_latest()
+#optimize_pngquant()
+optimize_optipng()
+downscale()
+#check_latest()
 #post_to_channel()
