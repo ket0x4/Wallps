@@ -32,9 +32,9 @@ models_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/
 realesrgan_zip_name = "realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
 
 # check os. if windows, exit
-if os.name == 'nt':
-    print("Windows is not supported")
-    sys.exit()
+#if os.name == 'nt':
+#    print("this script does not support windows yet. exiting...")
+#    sys.exit()
 
 if not os.path.exists(workdir):
     os.makedirs(workdir)
@@ -161,9 +161,6 @@ def rename():
 # post to channel
 #def post_to_channel():
     print('Posting to channel...')
-
-    
-    
 
 download_realesrgan()
 download_models()
