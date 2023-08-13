@@ -98,52 +98,58 @@ def upscale():
             if width < 920 or height < 480:
                 print(f"{filename} is {width}x{height}. Upscaling...")
                 os.system(f"{os.path.join(bin_path, 'realesrgan-ncnn-vulkan')} -i {image_path} -o {os.path.join(workdir, filename)} -n {os.path.join(model_name)} -s {upscale_level} >> /dev/null 2>&1")
-                os.remove(image_path)
-#                print(f"{filename} Upscaled {upscale_level}x: New size is {os.path.getsize(os.path.join(workdir, filename))}")
+#                os.remove(image_path)
+                print(f"{filename} Upscaled")
             else:
                 print(f"{filename} is {width}x{height}. Skipping...")
-                os.system(f"mv {image_path} {os.path.join(readydir, filename)}")
-                print(f"{filename} Moved")
+#                os.system(f"mv {image_path} {os.path.join(readydir, filename)}")
+#                print(f"{filename} Moved")
 
 # optimize png files with pngquant
 def optimize_pngquant():
     print('Optimizing big files...')
     for filename in os.listdir(readydir):
         if filename.endswith(".png"):
-            image_path = os.path.join(readydir, filename)
-            old_size = os.path.getsize(image_path)
-            os.system(f"pngquant --skip-if-larger --strip --force --output {image_path} {image_path}")
-            print(f"{filename} Optimized: from {old_size} to {os.path.getsize(image_path)}")
+            if os.path.getsize(os.path.join(readydir, filename)) < 5000000:
+                continue
+            else: 
+                image_path = os.path.join(readydir, filename)
+                old_size = os.path.getsize(image_path)
+                os.system(f"pngquant --skip-if-larger --strip --force --output {image_path} {image_path}")
+                print(f"{filename} Optimized: from {old_size} to {os.path.getsize(image_path)}")
 
 # optimize png files with optipng
 def optimize_optipng():
     print('Optimizing big files using Optifine Level 7...')
     for filename in os.listdir(readydir):
         if filename.endswith(".png"):
-            if os.path.getsize(os.path.join(readydir, filename)) < 1000000:
+            # if file size is less than 5mb, skip
+            if os.path.getsize(os.path.join(readydir, filename)) < 5000000:
                 continue
             else:
                 image_path = os.path.join(readydir, filename)
                 old_size = os.path.getsize(image_path)
-                os.system(f"optipng -o7 {image_path}")
+                os.system(f"optipng -o7 {image_path} >> /dev/null 2>&1")
                 print(f"{filename} Optimized: from {old_size} to {os.path.getsize(image_path)}")
 
 # downsacle big images by 25%
 def downscale():
-    for filename in os.listdir(readydir):
+    for filename in os.listdir(workdir):
         if filename.endswith(".png"):
-            if os.path.getsize(os.path.join(workdir, filename)) < 1000000:
+            if os.path.getsize(os.path.join(workdir, filename)) < 5000000:
                 continue
             else:
-                print(f"{filename} is too big. Downscaling...")
                 image_path = os.path.join(workdir, filename)
+                print(f"{filename} is {os.path.getsize(image_path)} bytes. {Image.open(image_path).size}")
                 image = Image.open(image_path)
                 width, height = image.size
                 new_width = int(width * 0.75)
                 new_height = int(height * 0.75)
-                image = image.resize((new_width, new_height), Image.ANTIALIAS)
-                image.save(image_path, "PNG")
-                print(f"{filename} Downscaled: New size is {os.path.getsize(image_path)}")
+                image = image.resize((new_width, new_height))
+                image.save(os.path.join(readydir, filename))
+                moved_file = os.path.join(readydir, filename)
+                print(f"{filename} Downscaled to {new_width}x{new_height}. new size: {os.path.getsize(moved_file)} ")
+                os.remove(image_path)
 
 # check telegram channel for last posted image name
 def check_latest():
@@ -164,7 +170,7 @@ download_models()
 convert2png()
 upscale()
 #optimize_pngquant()
-optimize_optipng()
+#optimize_optipng()
 downscale()
 #check_latest()
 #post_to_channel()
